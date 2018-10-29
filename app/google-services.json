@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "449987947458",
+    "firebase_url": "https://logical-delivery.firebaseio.com",
+    "project_id": "logical-delivery",
+    "storage_bucket": "logical-delivery.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:449987947458:android:9ebc851300c92282",
+        "android_client_info": {
+          "package_name": "com.logicaldelivery.projeto.logicaldelivery"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "449987947458-bnpakotj590p72t0q38275j6pur98pi4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.logicaldelivery.projeto.logicaldelivery",
+            "certificate_hash": "9bf4f949feec4285c012c16cdf39502ab6d04843"
+          }
+        },
+        {
+          "client_id": "449987947458-nsl52devrpeth81618qeekfhbos64e7f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0f3Q58FRtgXsmP_qXqbIfdMsaR0-NgbU"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "449987947458-nsl52devrpeth81618qeekfhbos64e7f.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
