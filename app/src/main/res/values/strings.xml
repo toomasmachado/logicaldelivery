@@ -4,4 +4,5 @@
     <string name="title_cadastro">Cadastrar Uma Conta</string>
     <string name="title_login">Acessar Minha Conta</string>
     <string name="title_activity_cliente">ClienteActivity</string>
+    <string name="title_activity_entrega">EntregaActivity</string>
 </resources>

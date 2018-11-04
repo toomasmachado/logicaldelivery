@@ -54,7 +54,16 @@
         <activity
             android:name=".activity.ClienteActivity"
             android:label="@string/title_activity_cliente"
-            android:theme="@style/AppTheme.NoActionBar"></activity>
+            android:theme="@style/AppTheme.NoActionBar" />
+        <activity
+            android:name=".activity.EntregaActivity"
+            android:label="@string/title_activity_entrega"
+            android:parentActivityName=".activity.RequisicoesActivity"
+            android:theme="@style/AppTheme.NoActionBar">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.logicaldelivery.projeto.logicaldelivery.activity.RequisicoesActivity" />
+        </activity>
     </application>
 
 </manifest>
