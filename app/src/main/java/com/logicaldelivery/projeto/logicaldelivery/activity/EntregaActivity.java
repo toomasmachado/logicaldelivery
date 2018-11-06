@@ -2,17 +2,22 @@ package com.logicaldelivery.projeto.logicaldelivery.activity;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.provider.ContactsContract;
+import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.View;
+import android.widget.Button;
+import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
@@ -20,8 +25,18 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.ValueEventListener;
+import com.logicaldelivery.projeto.logicaldelivery.Config.ConfiguracaoFirebase;
 import com.logicaldelivery.projeto.logicaldelivery.R;
+import com.logicaldelivery.projeto.logicaldelivery.model.Requisicao;
+import com.logicaldelivery.projeto.logicaldelivery.model.Usuario;
 
 public class EntregaActivity extends AppCompatActivity
         implements OnMapReadyCallback {
@@ -31,6 +46,17 @@ public class EntregaActivity extends AppCompatActivity
     private LocationManager locationManager;
     private LocationListener locationListener;
     private LatLng localEntregador;
+    private LatLng localCliente;
+    private Usuario entregador;
+    private Usuario cliente;
+    private String idRequisicao;
+    private Requisicao requisicao;
+    private DatabaseReference firebaseRef;
+    private Button buttonAceitarEntrega;
+    private Marker marcadorMotorista;
+    private Marker marcadorCliente;
+    private String statusRequisicao;
+    private boolean requisicaoAtiva;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,6 +64,116 @@ public class EntregaActivity extends AppCompatActivity
         setContentView(R.layout.activity_entrega);
 
         inicializarComponentes();
+
+        //Recupera dados do usuario
+        if(getIntent().getExtras().containsKey("idRequisicao")
+            && getIntent().getExtras().containsKey("entregador")) {
+            Bundle extras = getIntent().getExtras();
+            entregador = (Usuario) extras.getSerializable("entregador");
+            localEntregador = new LatLng(
+                    Double.parseDouble(entregador.getLatitude()),
+                    Double.parseDouble(entregador.getLongitude())
+            );
+            idRequisicao = extras.getString("idRequisicao");
+            requisicaoAtiva = extras.getBoolean("requisicaoAtiva");
+
+            verificaStatusRequisicao();
+
+        }
+    }
+
+    private void verificaStatusRequisicao(){
+        DatabaseReference requisicoes = firebaseRef.child("requisicoes")
+                .child(idRequisicao);
+        requisicoes.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                //Recupera requisicão
+                requisicao = dataSnapshot.getValue(Requisicao.class);
+                if(requisicao!=null){
+                    cliente = requisicao.getEntrega();
+                    localCliente = new LatLng(
+                            Double.parseDouble(cliente.getLatitude()),
+                            Double.parseDouble(cliente.getLongitude())
+                    );
+                    statusRequisicao = requisicao.getStatus();
+                    alteraInterfaceStatusRequisicao(statusRequisicao);
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+
+            }
+        });
+    }
+
+    private void alteraInterfaceStatusRequisicao(String status){
+        switch (status){
+            case Requisicao.STATUS_AGUARDANDO:
+                requisicaoAguardando();
+                break;
+            case Requisicao.STATUS_ACAMINHO:
+                requisicaoACaminho();
+                break;
+        }
+    }
+
+    private void requisicaoAguardando(){
+        buttonAceitarEntrega.setText("Aceitar Entrega");
+    }
+
+    private void requisicaoACaminho(){
+        buttonAceitarEntrega.setText("A caminho do cliente");
+
+        //Exibe Marcador do motorista/entregador
+        adicionaMarcadorMotorista(localEntregador, entregador.getNome());
+
+        //Exibe local do cliente
+        adicionaMarcadorCliente(localCliente, cliente.getNome());
+
+        centralizarDoisMarcadores(marcadorMotorista, marcadorCliente);
+    }
+
+    private void centralizarDoisMarcadores(Marker marcador1, Marker marcador2){
+        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+        builder.include(marcador1.getPosition());
+        builder.include(marcador2.getPosition());
+
+        LatLngBounds bounds = builder.build();
+
+        int largura = getResources().getDisplayMetrics().widthPixels;
+        int altura = getResources().getDisplayMetrics().heightPixels;
+        int espacoInterno = (int) (largura*0.2);
+
+        mMap.moveCamera(
+                CameraUpdateFactory.newLatLngBounds(bounds, largura, altura, espacoInterno)
+        );
+    }
+
+    private void adicionaMarcadorMotorista(LatLng localizacao, String titulo){
+        if( marcadorMotorista != null)
+            marcadorMotorista.remove();
+
+        marcadorMotorista = mMap.addMarker(
+                new MarkerOptions()
+                        .position(localizacao)
+                        .title(titulo)
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.carro))
+        );
+    }
+
+    private void adicionaMarcadorCliente(LatLng localizacao, String titulo){
+        if( marcadorCliente != null)
+            marcadorCliente.remove();
+
+        marcadorCliente = mMap.addMarker(
+                new MarkerOptions()
+                        .position(localizacao)
+                        .title(titulo)
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.usuario))
+        );
+
     }
 
     /**
@@ -69,16 +205,7 @@ public class EntregaActivity extends AppCompatActivity
                 double longitude = location.getLongitude();
                 localEntregador = new LatLng(latitude, longitude);
 
-                mMap.clear();
-                mMap.addMarker(
-                        new MarkerOptions()
-                                .position(localEntregador)
-                                .title("Meu Local")
-                                .icon(BitmapDescriptorFactory.fromResource(R.drawable.carro))
-                );
-                mMap.moveCamera(
-                        CameraUpdateFactory.newLatLngZoom(localEntregador, 15)
-                );
+                alteraInterfaceStatusRequisicao(statusRequisicao);
             }
 
             @Override
@@ -100,8 +227,8 @@ public class EntregaActivity extends AppCompatActivity
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             locationManager.requestLocationUpdates(
                     LocationManager.GPS_PROVIDER,
-                    10000,
-                    10,
+                    0,
+                    0,
                     locationListener
             );
         }
@@ -109,6 +236,13 @@ public class EntregaActivity extends AppCompatActivity
     }
 
     public void aceitarEntrega(View view){
+
+        requisicao = new Requisicao();
+        requisicao.setId(idRequisicao);
+        requisicao.setMotorista(entregador);
+        requisicao.setStatus(Requisicao.STATUS_ACAMINHO);
+
+        requisicao.atualizar();
 
     }
 
@@ -119,9 +253,24 @@ public class EntregaActivity extends AppCompatActivity
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setTitle("Iniciar Entrega");
 
+        buttonAceitarEntrega = findViewById(R.id.buttonAceitarEntrega);
+
+        //Configurações iniciais
+        firebaseRef = ConfiguracaoFirebase.getFirebaseDatabase();
+
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
     }
 
+    @Override
+    public boolean onSupportNavigateUp() {
+        if(requisicaoAtiva){
+            Toast.makeText(EntregaActivity.this, "Necessário encerrar requisição atual!",Toast.LENGTH_SHORT).show();
+        }else{
+            Intent i = new Intent(EntregaActivity.this, RequisicoesActivity.class);
+            startActivity(i);
+        }
+        return false;
+    }
 }
