@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -19,11 +20,17 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import com.firebase.geofire.GeoFire;
+import com.firebase.geofire.GeoLocation;
+import com.firebase.geofire.GeoQuery;
+import com.firebase.geofire.GeoQueryEventListener;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
@@ -35,6 +42,7 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.ValueEventListener;
 import com.logicaldelivery.projeto.logicaldelivery.Config.ConfiguracaoFirebase;
 import com.logicaldelivery.projeto.logicaldelivery.R;
+import com.logicaldelivery.projeto.logicaldelivery.helper.UsuarioFirebase;
 import com.logicaldelivery.projeto.logicaldelivery.model.Requisicao;
 import com.logicaldelivery.projeto.logicaldelivery.model.Usuario;
 
@@ -120,7 +128,14 @@ public class EntregaActivity extends AppCompatActivity
     }
 
     private void requisicaoAguardando(){
+
         buttonAceitarEntrega.setText("Aceitar Entrega");
+        //Exibe Marcador do motorista/entregador
+        adicionaMarcadorMotorista(localEntregador, entregador.getNome());
+
+        mMap.moveCamera(
+                CameraUpdateFactory.newLatLngZoom(localEntregador, 20)
+        );
     }
 
     private void requisicaoACaminho(){
@@ -132,7 +147,64 @@ public class EntregaActivity extends AppCompatActivity
         //Exibe local do cliente
         adicionaMarcadorCliente(localCliente, cliente.getNome());
 
+        //Centralizar dois marcadores
         centralizarDoisMarcadores(marcadorMotorista, marcadorCliente);
+
+        //Inicia monitoramento do motorista
+        iniciarMonitoramentoCorrida(cliente, entregador);
+    }
+
+    private void iniciarMonitoramentoCorrida(final Usuario cliente, final Usuario entregador){
+        //Inicializando GeoFire
+        DatabaseReference localUsuario = ConfiguracaoFirebase.getFirebaseDatabase()
+                .child("local_usuario");
+        GeoFire geoFire = new GeoFire(localUsuario);
+
+        //Adiciona Circulo no Passageiro
+        final Circle circle = mMap.addCircle(
+                new CircleOptions()
+                .center(localCliente)
+                .radius(50)
+                .fillColor(Color.argb(90,255, 153, 0))
+                .strokeColor(Color.argb(190,255,153,0))
+        );
+        final GeoQuery geoQuery = geoFire.queryAtLocation(
+                new GeoLocation(localCliente.latitude, localCliente.longitude),
+                0.05
+        );
+
+        geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
+            @Override
+            public void onKeyEntered(String key, GeoLocation location) {
+             if(key.equals(entregador.getId())){
+                 requisicao.setStatus(Requisicao.STATUS_VIAGEM);
+                 requisicao.atualizarStatus();
+
+                 geoQuery.removeAllListeners();
+                 circle.remove();
+                }
+            }
+
+            @Override
+            public void onKeyExited(String key) {
+
+            }
+
+            @Override
+            public void onKeyMoved(String key, GeoLocation location) {
+
+            }
+
+            @Override
+            public void onGeoQueryReady() {
+
+            }
+
+            @Override
+            public void onGeoQueryError(DatabaseError error) {
+
+            }
+        });
     }
 
     private void centralizarDoisMarcadores(Marker marcador1, Marker marcador2){
@@ -204,6 +276,9 @@ public class EntregaActivity extends AppCompatActivity
                 double latitude = location.getLatitude();
                 double longitude = location.getLongitude();
                 localEntregador = new LatLng(latitude, longitude);
+
+                //atualizar Geofire
+                UsuarioFirebase.atualizarDadosLocalizacao(latitude, longitude);
 
                 alteraInterfaceStatusRequisicao(statusRequisicao);
             }

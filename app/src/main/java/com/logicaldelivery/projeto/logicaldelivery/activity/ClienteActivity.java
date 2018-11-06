@@ -185,7 +185,9 @@ public class ClienteActivity extends AppCompatActivity
             }
             //Fim
         }else{
+            //Cancelar requisição
 
+            entregadorChamado = false;
         }
 
 
@@ -239,6 +241,9 @@ public class ClienteActivity extends AppCompatActivity
                 double latitude = location.getLatitude();
                 double longitude = location.getLongitude();
                 localPassageiro = new LatLng(latitude, longitude);
+
+                //atualizar Geofire
+                UsuarioFirebase.atualizarDadosLocalizacao(latitude, longitude);
 
                 mMap.clear();
                 mMap.addMarker(
