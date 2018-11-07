@@ -1,6 +1,7 @@
 package com.logicaldelivery.projeto.logicaldelivery.activity;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -8,6 +9,7 @@ import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.support.annotation.NonNull;
@@ -43,6 +45,7 @@ import com.google.firebase.database.ValueEventListener;
 import com.logicaldelivery.projeto.logicaldelivery.Config.ConfiguracaoFirebase;
 import com.logicaldelivery.projeto.logicaldelivery.R;
 import com.logicaldelivery.projeto.logicaldelivery.helper.UsuarioFirebase;
+import com.logicaldelivery.projeto.logicaldelivery.model.Destino;
 import com.logicaldelivery.projeto.logicaldelivery.model.Requisicao;
 import com.logicaldelivery.projeto.logicaldelivery.model.Usuario;
 
@@ -65,6 +68,9 @@ public class EntregaActivity extends AppCompatActivity
     private Marker marcadorCliente;
     private String statusRequisicao;
     private boolean requisicaoAtiva;
+    private FloatingActionButton fabRota;
+    private Marker marcadorDestino;
+    private Destino destino;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -91,7 +97,7 @@ public class EntregaActivity extends AppCompatActivity
     }
 
     private void verificaStatusRequisicao(){
-        DatabaseReference requisicoes = firebaseRef.child("requisicoes")
+        final DatabaseReference requisicoes = firebaseRef.child("requisicoes")
                 .child(idRequisicao);
         requisicoes.addValueEventListener(new ValueEventListener() {
             @Override
@@ -105,6 +111,7 @@ public class EntregaActivity extends AppCompatActivity
                             Double.parseDouble(cliente.getLongitude())
                     );
                     statusRequisicao = requisicao.getStatus();
+                    destino = requisicao.getDestino();
                     alteraInterfaceStatusRequisicao(statusRequisicao);
                 }
             }
@@ -124,6 +131,9 @@ public class EntregaActivity extends AppCompatActivity
             case Requisicao.STATUS_ACAMINHO:
                 requisicaoACaminho();
                 break;
+            case Requisicao.STATUS_VIAGEM:
+                requisicaoViagem();
+                break;
         }
     }
 
@@ -138,8 +148,10 @@ public class EntregaActivity extends AppCompatActivity
         );
     }
 
+    @SuppressLint("RestrictedApi")
     private void requisicaoACaminho(){
         buttonAceitarEntrega.setText("A caminho do cliente");
+        fabRota.setVisibility(View.VISIBLE);
 
         //Exibe Marcador do motorista/entregador
         adicionaMarcadorMotorista(localEntregador, entregador.getNome());
@@ -152,6 +164,28 @@ public class EntregaActivity extends AppCompatActivity
 
         //Inicia monitoramento do motorista
         iniciarMonitoramentoCorrida(cliente, entregador);
+
+    }
+
+    @SuppressLint("RestrictedApi")
+    private void requisicaoViagem(){
+        //Altera interface
+        fabRota.setVisibility(View.VISIBLE);
+        buttonAceitarEntrega.setText("Entrega Iniciada");
+
+        //Exibe Marcador do motorista
+         adicionaMarcadorMotorista(localEntregador, entregador.getNome());
+
+        //Exibe Marcador do destino
+        LatLng localDestino = new LatLng(
+                Double.parseDouble(destino.getLatitude()),
+                Double.parseDouble(destino.getLongitude())
+        );
+        adicionaMarcadorDestino(localDestino, "Destino");
+
+        //Centraliza Marcadores motorista/destino
+        centralizarDoisMarcadores(marcadorMotorista, marcadorDestino);
+
     }
 
     private void iniciarMonitoramentoCorrida(final Usuario cliente, final Usuario entregador){
@@ -248,6 +282,21 @@ public class EntregaActivity extends AppCompatActivity
 
     }
 
+    private void adicionaMarcadorDestino(LatLng localizacao, String titulo){
+        if( marcadorCliente != null)
+            marcadorCliente.remove();
+
+        if( marcadorDestino != null)
+            marcadorDestino.remove();
+
+        marcadorDestino = mMap.addMarker(
+                new MarkerOptions()
+                        .position(localizacao)
+                        .title(titulo)
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.destino))
+        );
+    }
+
     /**
      * Manipulates the map once available.
      * This callback is triggered when the map is ready to be used.
@@ -336,6 +385,35 @@ public class EntregaActivity extends AppCompatActivity
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+        fabRota = findViewById(R.id.fabRota);
+        fabRota.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String status = statusRequisicao;
+                if(status != null && !status.isEmpty()) {
+                    String lat = "";
+                    String lon = "";
+                    switch (status) {
+                        case Requisicao.STATUS_ACAMINHO:
+                            lat = String.valueOf(localCliente.latitude);
+                            lon = String.valueOf(localCliente.longitude);
+                            break;
+                        case Requisicao.STATUS_VIAGEM:
+                            lat = destino.getLatitude();
+                            lon = destino.getLongitude();
+                            break;
+                    }
+
+                    //abrir rota
+                    String latLon = lat + "," + lon;
+                    Uri uri = Uri.parse("google.navigation:q="+latLon+"&mode=b");
+                    Intent mapIntent = new Intent(Intent.ACTION_VIEW, uri);
+                    mapIntent.setPackage("com.google.android.apps.maps");
+                    startActivity(mapIntent);
+                }
+            }
+        });
     }
 
     @Override
