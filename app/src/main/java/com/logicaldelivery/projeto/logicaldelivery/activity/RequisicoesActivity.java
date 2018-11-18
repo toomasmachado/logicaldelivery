@@ -81,7 +81,9 @@ public class RequisicoesActivity extends AppCompatActivity {
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 for (DataSnapshot ds: dataSnapshot.getChildren()){
                     Requisicao requisicao = ds.getValue(Requisicao.class);
-                    if(requisicao.getStatus().equals(Requisicao.STATUS_ACAMINHO)|| requisicao.getStatus().equals(Requisicao.STATUS_VIAGEM)){
+                    if(requisicao.getStatus().equals(Requisicao.STATUS_ACAMINHO)
+                            || requisicao.getStatus().equals(Requisicao.STATUS_VIAGEM)
+                            || requisicao.getStatus().equals(Requisicao.STATUS_FINALIZADA)){
                         motorista = requisicao.getMotorista();
                         abrirTelaCorrida(requisicao.getId(), motorista, true);
                     }

@@ -44,10 +44,13 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.ValueEventListener;
 import com.logicaldelivery.projeto.logicaldelivery.Config.ConfiguracaoFirebase;
 import com.logicaldelivery.projeto.logicaldelivery.R;
+import com.logicaldelivery.projeto.logicaldelivery.helper.Local;
 import com.logicaldelivery.projeto.logicaldelivery.helper.UsuarioFirebase;
 import com.logicaldelivery.projeto.logicaldelivery.model.Destino;
 import com.logicaldelivery.projeto.logicaldelivery.model.Requisicao;
 import com.logicaldelivery.projeto.logicaldelivery.model.Usuario;
+
+import java.text.DecimalFormat;
 
 public class EntregaActivity extends AppCompatActivity
         implements OnMapReadyCallback {
@@ -127,14 +130,26 @@ public class EntregaActivity extends AppCompatActivity
         switch (status){
             case Requisicao.STATUS_AGUARDANDO:
                 requisicaoAguardando();
-                break;
+            break;
             case Requisicao.STATUS_ACAMINHO:
                 requisicaoACaminho();
                 break;
             case Requisicao.STATUS_VIAGEM:
                 requisicaoViagem();
                 break;
+            case Requisicao.STATUS_FINALIZADA:
+                requisicaoFinalizada();
+                break;
+            case Requisicao.STATUS_CANCELADA:
+                requisicaoCancelada();
+                break;
         }
+    }
+
+    private void centralizarMarcadores(LatLng local){
+        mMap.moveCamera(
+                CameraUpdateFactory.newLatLngZoom(local, 20)
+        );
     }
 
     private void requisicaoAguardando(){
@@ -143,9 +158,7 @@ public class EntregaActivity extends AppCompatActivity
         //Exibe Marcador do motorista/entregador
         adicionaMarcadorMotorista(localEntregador, entregador.getNome());
 
-        mMap.moveCamera(
-                CameraUpdateFactory.newLatLngZoom(localEntregador, 20)
-        );
+        centralizarMarcadores(localEntregador);
     }
 
     @SuppressLint("RestrictedApi")
@@ -163,7 +176,7 @@ public class EntregaActivity extends AppCompatActivity
         centralizarDoisMarcadores(marcadorMotorista, marcadorCliente);
 
         //Inicia monitoramento do motorista
-        iniciarMonitoramentoCorrida(cliente, entregador);
+        iniciarMonitoramento(entregador, localCliente, Requisicao.STATUS_VIAGEM);
 
     }
 
@@ -186,32 +199,72 @@ public class EntregaActivity extends AppCompatActivity
         //Centraliza Marcadores motorista/destino
         centralizarDoisMarcadores(marcadorMotorista, marcadorDestino);
 
+        //Inicia monitoramento da viagem
+        iniciarMonitoramento(entregador, localDestino, Requisicao.STATUS_FINALIZADA);
+
     }
 
-    private void iniciarMonitoramentoCorrida(final Usuario cliente, final Usuario entregador){
+    @SuppressLint("RestrictedApi")
+    private void requisicaoFinalizada(){
+        fabRota.setVisibility(View.GONE);
+        requisicaoAtiva = false;
+
+        if( marcadorCliente != null)
+            marcadorCliente.remove();
+
+        if( marcadorDestino != null)
+            marcadorDestino.remove();
+
+        //Exibir marcador de destino
+        LatLng localDestino = new LatLng(
+                Double.parseDouble(destino.getLatitude()),
+                Double.parseDouble(destino.getLongitude())
+        );
+
+        adicionaMarcadorDestino(localDestino, "Destino");
+        centralizarMarcadores(localDestino);
+
+        //Calcular distancia
+        float distancia = Local.calcularDistancia(localCliente, localDestino);
+
+        float valor = distancia *4;
+
+        DecimalFormat decimalFormat = new DecimalFormat("0.00");
+        String resultado = decimalFormat.format(valor);
+
+        buttonAceitarEntrega.setText("Corrida Finalizada - R$ " + resultado);
+
+    }
+
+    private void requisicaoCancelada(){
+        Toast.makeText(this, "Requisição foi cancelada pelo cliente!", Toast.LENGTH_SHORT).show();
+        startActivity(new Intent(EntregaActivity.this, RequisicoesActivity.class));
+    }
+
+    private void iniciarMonitoramento(final Usuario usuOrigem , LatLng localDestino, final String status){
         //Inicializando GeoFire
         DatabaseReference localUsuario = ConfiguracaoFirebase.getFirebaseDatabase()
                 .child("local_usuario");
         GeoFire geoFire = new GeoFire(localUsuario);
 
-        //Adiciona Circulo no Passageiro
+        //Adiciona Circulo no cliente
         final Circle circle = mMap.addCircle(
                 new CircleOptions()
-                .center(localCliente)
+                .center(localDestino)
                 .radius(50)
                 .fillColor(Color.argb(90,255, 153, 0))
                 .strokeColor(Color.argb(190,255,153,0))
         );
         final GeoQuery geoQuery = geoFire.queryAtLocation(
-                new GeoLocation(localCliente.latitude, localCliente.longitude),
+                new GeoLocation(localDestino.latitude, localDestino.longitude),
                 0.05
         );
 
         geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
             @Override
             public void onKeyEntered(String key, GeoLocation location) {
-             if(key.equals(entregador.getId())){
-                 requisicao.setStatus(Requisicao.STATUS_VIAGEM);
+             if(key.equals(usuOrigem.getId())){
+                 requisicao.setStatus(status);
                  requisicao.atualizarStatus();
 
                  geoQuery.removeAllListeners();
@@ -329,6 +382,11 @@ public class EntregaActivity extends AppCompatActivity
                 //atualizar Geofire
                 UsuarioFirebase.atualizarDadosLocalizacao(latitude, longitude);
 
+                //Atualizar localização entregador no firebase
+                entregador.setLatitude(String.valueOf(latitude));
+                entregador.setLongitude(String.valueOf(longitude));
+                requisicao.setMotorista( entregador );
+                requisicao.atualizarLocalizacaoEntregador();
                 alteraInterfaceStatusRequisicao(statusRequisicao);
             }
 
@@ -423,6 +481,12 @@ public class EntregaActivity extends AppCompatActivity
         }else{
             Intent i = new Intent(EntregaActivity.this, RequisicoesActivity.class);
             startActivity(i);
+        }
+
+        //Verificar Status da requisição
+        if (statusRequisicao != null && !statusRequisicao.isEmpty()){
+            requisicao.setStatus(Requisicao.STATUS_ENCERRADA);
+            requisicao.atualizarStatus();
         }
         return false;
     }

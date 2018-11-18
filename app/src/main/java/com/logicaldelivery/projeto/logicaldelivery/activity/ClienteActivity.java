@@ -3,6 +3,7 @@ package com.logicaldelivery.projeto.logicaldelivery.activity;
 import android.Manifest;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -32,6 +33,8 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
@@ -41,12 +44,14 @@ import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 import com.logicaldelivery.projeto.logicaldelivery.Config.ConfiguracaoFirebase;
 import com.logicaldelivery.projeto.logicaldelivery.R;
+import com.logicaldelivery.projeto.logicaldelivery.helper.Local;
 import com.logicaldelivery.projeto.logicaldelivery.helper.UsuarioFirebase;
 import com.logicaldelivery.projeto.logicaldelivery.model.Destino;
 import com.logicaldelivery.projeto.logicaldelivery.model.Requisicao;
 import com.logicaldelivery.projeto.logicaldelivery.model.Usuario;
 
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -59,13 +64,21 @@ public class ClienteActivity extends AppCompatActivity
     private LinearLayout linearLayoutDestino;
     private Button buttonChamarEntregador;
     private Requisicao requisicao;
+    private Usuario cliente;
+    private Usuario motorista;
+    private String statusRequisicao;
+    private Destino destino;
+    private Marker marcadorCliente;
+    private Marker marcadorMotorista;
+    private Marker marcadorDestino;
+    private LatLng localMotorista;
 
     private GoogleMap mMap;
     private FirebaseAuth autenticacao;
     private LocationManager locationManager;
     private LocationListener locationListener;
-    private LatLng localPassageiro;
-    private boolean entregadorChamado = false;
+    private LatLng localCliente;
+    private boolean cancelarEntrega = false;
     private DatabaseReference firebaseRef;
 
     @Override
@@ -99,17 +112,31 @@ public class ClienteActivity extends AppCompatActivity
 
                 if(lista != null && lista.size() > 0) {
                     requisicao = lista.get(0);
+                if (!requisicao.getStatus().equals(Requisicao.STATUS_ENCERRADA)){
+                    if(requisicao!=null) {
+                        cliente = requisicao.getEntrega();
+                        localCliente = new LatLng(
+                                Double.parseDouble(cliente.getLatitude()),
+                                Double.parseDouble(cliente.getLongitude())
+                        );
+                        statusRequisicao = requisicao.getStatus();
+                        destino = requisicao.getDestino();
+                        if (requisicao.getMotorista() != null) {
+                            motorista = requisicao.getMotorista();
+                            localMotorista = new LatLng(
+                                    Double.parseDouble(motorista.getLatitude()),
+                                    Double.parseDouble(motorista.getLongitude())
 
-                    switch (requisicao.getStatus()){
-                        case Requisicao.STATUS_AGUARDANDO:
-                            linearLayoutDestino.setVisibility(View.GONE);
-                            buttonChamarEntregador.setText("Cancelar Entrega");
-                            entregadorChamado = true;
-                            break;
+                            );
+                        }
+                        alteraInterfaceStatusRequisicao(statusRequisicao);
+                    }
+                    }
+
                     }
                 }
 
-            }
+
 
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
@@ -118,6 +145,189 @@ public class ClienteActivity extends AppCompatActivity
         });
     }
 
+    private void alteraInterfaceStatusRequisicao(String status){
+
+        if (status != null && !status.isEmpty()) {
+            cancelarEntrega = false;
+            switch (requisicao.getStatus()) {
+                case Requisicao.STATUS_AGUARDANDO:
+                    requisicaoAguardando();
+                    break;
+                case Requisicao.STATUS_ACAMINHO:
+                    requisicaoACaminho();
+                    break;
+                case Requisicao.STATUS_VIAGEM:
+                    requisicaoViagem();
+                    break;
+                case Requisicao.STATUS_FINALIZADA:
+                    requisicaoFinalizada();
+                    break;
+                case Requisicao.STATUS_CANCELADA:
+                    requisicaoCancelada();
+                    break;
+
+            }
+        }else{
+            adicionaMarcadorCliente(localCliente, "Seu local");
+            centralizarMarcadores(localCliente);
+
+        }
+
+    }
+
+    private void requisicaoAguardando(){
+        linearLayoutDestino.setVisibility(View.GONE);
+        buttonChamarEntregador.setText("Cancelar Entrega");
+        cancelarEntrega = true;
+
+        //Adiciona marcador cliente
+        adicionaMarcadorCliente(localCliente, cliente.getNome());
+        centralizarMarcadores(localCliente);
+    }
+
+    private void requisicaoACaminho(){
+        linearLayoutDestino.setVisibility(View.GONE);
+        buttonChamarEntregador.setText("Motorista a caminho");
+        buttonChamarEntregador.setEnabled(false);
+
+        //Adiciona Marcador cliente
+        adicionaMarcadorCliente(localCliente, cliente.getNome());
+
+        //Adiciona Marcador Entregador
+        adicionaMarcadorMotorista(localMotorista, motorista.getNome());
+
+        //centralizar os usuários
+        centralizarDoisMarcadores(marcadorMotorista, marcadorCliente);
+    }
+
+    private void requisicaoViagem(){
+        linearLayoutDestino.setVisibility(View.GONE);
+        buttonChamarEntregador.setText("Entrega a caminho");
+        buttonChamarEntregador.setEnabled(false);
+
+        //Adiciona Marcador Entregador
+        adicionaMarcadorMotorista(localMotorista, motorista.getNome());
+
+        //Marcador de destino
+        LatLng localDestino = new LatLng(
+                Double.parseDouble(destino.getLatitude()),
+                Double.parseDouble(destino.getLongitude())
+        );
+        adicionaMarcadorDestino(localDestino,"Destino");
+
+        centralizarDoisMarcadores(marcadorMotorista, marcadorDestino);
+    }
+
+    private void requisicaoFinalizada(){
+        linearLayoutDestino.setVisibility(View.GONE);
+        buttonChamarEntregador.setText("Entrega finalizada");
+        buttonChamarEntregador.setEnabled(false);
+
+        //Marcador de destino
+        LatLng localDestino = new LatLng(
+                Double.parseDouble(destino.getLatitude()),
+                Double.parseDouble(destino.getLongitude())
+        );
+        adicionaMarcadorDestino(localDestino,"Destino");
+
+        centralizarMarcadores(localDestino);
+
+        //Calcular distancia
+        float distancia = Local.calcularDistancia(localCliente, localDestino);
+
+        float valor = distancia *4;
+
+        DecimalFormat decimalFormat = new DecimalFormat("0.00");
+        final String resultado = decimalFormat.format(valor);
+
+        buttonChamarEntregador.setText("Corrida Finalizada - R$ " + resultado);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle("Total da viagem")
+                .setMessage("Sua viagem ficou " + resultado)
+                .setCancelable(false)
+                .setNegativeButton("Encerrar Viagem", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        requisicao.setStatus(Requisicao.STATUS_ENCERRADA);
+                        requisicao.atualizarStatus();
+
+                        finish();
+                        startActivity(new Intent(getIntent()));
+                    }
+                });
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    private void requisicaoCancelada(){
+        linearLayoutDestino.setVisibility(View.GONE);
+        buttonChamarEntregador.setText("Chamar Entrega");
+        cancelarEntrega = false;
+    }
+
+    private void adicionaMarcadorCliente(LatLng localizacao, String titulo){
+        if( marcadorCliente != null)
+            marcadorCliente.remove();
+
+        marcadorCliente = mMap.addMarker(
+                new MarkerOptions()
+                        .position(localizacao)
+                        .title(titulo)
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.usuario))
+        );
+
+    }
+
+    private void adicionaMarcadorMotorista(LatLng localizacao, String titulo){
+        if( marcadorMotorista != null)
+            marcadorMotorista.remove();
+
+        marcadorMotorista = mMap.addMarker(
+                new MarkerOptions()
+                        .position(localizacao)
+                        .title(titulo)
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.carro))
+        );
+    }
+
+    private void adicionaMarcadorDestino(LatLng localizacao, String titulo){
+        if( marcadorCliente != null)
+            marcadorCliente.remove();
+
+        if( marcadorDestino != null)
+            marcadorDestino.remove();
+
+        marcadorDestino = mMap.addMarker(
+                new MarkerOptions()
+                        .position(localizacao)
+                        .title(titulo)
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.destino))
+        );
+    }
+
+    private void centralizarDoisMarcadores(Marker marcador1, Marker marcador2){
+        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+        builder.include(marcador1.getPosition());
+        builder.include(marcador2.getPosition());
+
+        LatLngBounds bounds = builder.build();
+
+        int largura = getResources().getDisplayMetrics().widthPixels;
+        int altura = getResources().getDisplayMetrics().heightPixels;
+        int espacoInterno = (int) (largura*0.2);
+
+        mMap.moveCamera(
+                CameraUpdateFactory.newLatLngBounds(bounds, largura, altura, espacoInterno)
+        );
+    }
+
+    private void centralizarMarcadores(LatLng local){
+        mMap.moveCamera(
+                CameraUpdateFactory.newLatLngZoom(local, 20)
+        );
+    }
     /**
      * Manipulates the map once available.
      * This callback is triggered when the map is ready to be used.
@@ -136,9 +346,16 @@ public class ClienteActivity extends AppCompatActivity
     }
     public void chamarEntregador(View view){
 
-        if ( !entregadorChamado ){
-            //Inicio
+        if ( cancelarEntrega ){
+            //Cancelar requisição
 
+            requisicao.setStatus(Requisicao.STATUS_CANCELADA);
+            requisicao.atualizarStatus();
+
+
+
+            //Fim
+        }else{
             String endereçoDestino = editDestino.getText().toString();
 
             if (!endereçoDestino.equals("") || endereçoDestino != null ){
@@ -167,7 +384,6 @@ public class ClienteActivity extends AppCompatActivity
                                 @Override
                                 public void onClick(DialogInterface dialog, int which) {
                                     salvarRequisicao(destino);
-                                    entregadorChamado = true;
                                 }
                             }).setNegativeButton("Cancelar", new DialogInterface.OnClickListener() {
                                 @Override
@@ -183,15 +399,7 @@ public class ClienteActivity extends AppCompatActivity
             }else{
                 Toast.makeText(this, "Informe o endereço de destino!", Toast.LENGTH_SHORT).show();
             }
-            //Fim
-        }else{
-            //Cancelar requisição
-
-            entregadorChamado = false;
         }
-
-
-
     }
 
     private void salvarRequisicao(Destino destino){
@@ -199,8 +407,8 @@ public class ClienteActivity extends AppCompatActivity
         requisicao.setDestino(destino);
 
         Usuario usuarioCliLogado = UsuarioFirebase.getDadosUsuarioLogado();
-        usuarioCliLogado.setLatitude(String.valueOf(localPassageiro.latitude));
-        usuarioCliLogado.setLongitude(String.valueOf(localPassageiro.longitude));
+        usuarioCliLogado.setLatitude(String.valueOf(localCliente.latitude));
+        usuarioCliLogado.setLongitude(String.valueOf(localCliente.longitude));
 
         requisicao.setEntrega(usuarioCliLogado);
 
@@ -240,21 +448,30 @@ public class ClienteActivity extends AppCompatActivity
 
                 double latitude = location.getLatitude();
                 double longitude = location.getLongitude();
-                localPassageiro = new LatLng(latitude, longitude);
+                localCliente = new LatLng(latitude, longitude);
 
                 //atualizar Geofire
                 UsuarioFirebase.atualizarDadosLocalizacao(latitude, longitude);
 
-                mMap.clear();
-                mMap.addMarker(
-                        new MarkerOptions()
-                                .position(localPassageiro)
-                                .title("Meu Local")
-                                .icon(BitmapDescriptorFactory.fromResource(R.drawable.usuario))
-                );
-                mMap.moveCamera(
-                        CameraUpdateFactory.newLatLngZoom(localPassageiro, 15)
-                );
+                //Altera interface de acordo com o status
+                alteraInterfaceStatusRequisicao(statusRequisicao);
+
+                if (statusRequisicao != null && !statusRequisicao.isEmpty()) {
+                    if (statusRequisicao.equals(Requisicao.STATUS_VIAGEM)
+                            || statusRequisicao.equals(Requisicao.STATUS_FINALIZADA)) {
+                        locationManager.removeUpdates(locationListener);
+                    }else{
+                        if (ActivityCompat.checkSelfPermission(ClienteActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                            locationManager.requestLocationUpdates(
+                                    LocationManager.GPS_PROVIDER,
+                                    10000,
+                                    10,
+                                    locationListener
+                            );
+                        }
+
+                    }
+                }
             }
 
             @Override

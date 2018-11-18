@@ -7,8 +7,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+
+import com.google.android.gms.maps.model.LatLng;
 import com.logicaldelivery.projeto.logicaldelivery.R;
 
+import com.logicaldelivery.projeto.logicaldelivery.helper.Local;
 import com.logicaldelivery.projeto.logicaldelivery.model.Requisicao;
 import com.logicaldelivery.projeto.logicaldelivery.model.Usuario;
 
@@ -42,7 +45,20 @@ public class RequisicoesAdapter extends RecyclerView.Adapter<RequisicoesAdapter.
         Entregador.getLongitude();
 
         holder.nome.setText(cliente.getNome());
-        holder.distancia.setText("1 km aproximadamente");
+        if(Entregador != null ){
+
+            LatLng localCliente = new LatLng(
+                    Double.parseDouble(cliente.getLatitude()),
+                    Double.parseDouble(cliente.getLongitude())
+            );
+            LatLng localEntregador = new LatLng(
+                    Double.parseDouble(Entregador.getLatitude()),
+                    Double.parseDouble(Entregador.getLongitude())
+            );
+            float distancia = Local.calcularDistancia(localCliente, localEntregador);
+            String distanciaForm = Local.formatarDistancia(distancia);
+            holder.distancia.setText(distanciaForm + "- aproximadamente");
+        }
     }
 
     @Override
