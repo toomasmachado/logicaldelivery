@@ -3,6 +3,7 @@ package com.logicaldelivery.projeto.logicaldelivery.activity;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -16,6 +17,7 @@ import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.View;
@@ -209,8 +211,8 @@ public class EntregaActivity extends AppCompatActivity
         fabRota.setVisibility(View.GONE);
         requisicaoAtiva = false;
 
-        if( marcadorCliente != null)
-            marcadorCliente.remove();
+        if( marcadorMotorista != null)
+            marcadorMotorista.remove();
 
         if( marcadorDestino != null)
             marcadorDestino.remove();
@@ -263,13 +265,30 @@ public class EntregaActivity extends AppCompatActivity
         geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
             @Override
             public void onKeyEntered(String key, GeoLocation location) {
-             if(key.equals(usuOrigem.getId())){
-                 requisicao.setStatus(status);
-                 requisicao.atualizarStatus();
+             if(key.equals(usuOrigem.getId())) {
+                 if (requisicao.getStatus().equals(Requisicao.STATUS_ACAMINHO)) {
+                     AlertDialog.Builder builder = new AlertDialog.Builder(EntregaActivity.this)
+                             .setTitle("Confirme após receber a entrega!")
+                             .setPositiveButton("Iniciar Entrega", new DialogInterface.OnClickListener() {
+                                 @Override
+                                 public void onClick(DialogInterface dialog, int which) {
+                                     requisicao.setStatus(status);
+                                     requisicao.atualizarStatus();
 
-                 geoQuery.removeAllListeners();
-                 circle.remove();
-                }
+                                     geoQuery.removeAllListeners();
+                                     circle.remove();
+                                 }
+                             });
+                     AlertDialog dialog = builder.create();
+                     dialog.show();
+                 }else{
+                     requisicao.setStatus(status);
+                     requisicao.atualizarStatus();
+
+                     geoQuery.removeAllListeners();
+                     circle.remove();
+                 }
+             }
             }
 
             @Override
@@ -484,7 +503,7 @@ public class EntregaActivity extends AppCompatActivity
         }
 
         //Verificar Status da requisição
-        if (statusRequisicao != null && !statusRequisicao.isEmpty()){
+        if (statusRequisicao.equals(Requisicao.STATUS_FINALIZADA)){
             requisicao.setStatus(Requisicao.STATUS_ENCERRADA);
             requisicao.atualizarStatus();
         }

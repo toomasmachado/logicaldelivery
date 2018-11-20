@@ -10,11 +10,11 @@ public class Local {
 
     public static float calcularDistancia(LatLng latLngInicial, LatLng latLngFinal){
 
-        Location localInicial = new Location("Local Inicial");
+        Location localInicial = new Location("Local inicial");
         localInicial.setLatitude(latLngInicial.latitude);
         localInicial.setLongitude(latLngInicial.longitude);
 
-        Location localFinal = new Location("Local Final");
+        Location localFinal = new Location("Local final");
         localFinal.setLatitude(latLngFinal.latitude);
         localFinal.setLongitude(latLngFinal.longitude);
 

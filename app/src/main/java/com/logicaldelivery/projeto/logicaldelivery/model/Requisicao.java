@@ -31,8 +31,6 @@ public class Requisicao {
         setId(idRequisicao);
 
         requisicoes.child(getId()).setValue(this);
-
-
     }
 
     public void atualizar(){
@@ -46,8 +44,6 @@ public class Requisicao {
 
         requisicao.updateChildren(objeto);
     }
-
-
 
     public void atualizarStatus(){
         DatabaseReference firebaseRef = ConfiguracaoFirebase.getFirebaseDatabase();

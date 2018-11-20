@@ -112,8 +112,10 @@ public class ClienteActivity extends AppCompatActivity
 
                 if(lista != null && lista.size() > 0) {
                     requisicao = lista.get(0);
-                if (!requisicao.getStatus().equals(Requisicao.STATUS_ENCERRADA)){
+
                     if(requisicao!=null) {
+                        if (!requisicao.getStatus().equals(Requisicao.STATUS_ENCERRADA)){
+
                         cliente = requisicao.getEntrega();
                         localCliente = new LatLng(
                                 Double.parseDouble(cliente.getLatitude()),
@@ -148,24 +150,27 @@ public class ClienteActivity extends AppCompatActivity
     private void alteraInterfaceStatusRequisicao(String status){
 
         if (status != null && !status.isEmpty()) {
-            cancelarEntrega = false;
-            switch (requisicao.getStatus()) {
+            switch (status) {
                 case Requisicao.STATUS_AGUARDANDO:
+                    cancelarEntrega = true;
                     requisicaoAguardando();
                     break;
                 case Requisicao.STATUS_ACAMINHO:
+                    cancelarEntrega = false;
                     requisicaoACaminho();
                     break;
                 case Requisicao.STATUS_VIAGEM:
+                    cancelarEntrega = false;
                     requisicaoViagem();
                     break;
                 case Requisicao.STATUS_FINALIZADA:
+                    cancelarEntrega = false;
                     requisicaoFinalizada();
                     break;
                 case Requisicao.STATUS_CANCELADA:
+                    cancelarEntrega = false;
                     requisicaoCancelada();
                     break;
-
             }
         }else{
             adicionaMarcadorCliente(localCliente, "Seu local");
@@ -178,7 +183,6 @@ public class ClienteActivity extends AppCompatActivity
     private void requisicaoAguardando(){
         linearLayoutDestino.setVisibility(View.GONE);
         buttonChamarEntregador.setText("Cancelar Entrega");
-        cancelarEntrega = true;
 
         //Adiciona marcador cliente
         adicionaMarcadorCliente(localCliente, cliente.getNome());
@@ -220,7 +224,6 @@ public class ClienteActivity extends AppCompatActivity
 
     private void requisicaoFinalizada(){
         linearLayoutDestino.setVisibility(View.GONE);
-        buttonChamarEntregador.setText("Entrega finalizada");
         buttonChamarEntregador.setEnabled(false);
 
         //Marcador de destino
@@ -229,7 +232,6 @@ public class ClienteActivity extends AppCompatActivity
                 Double.parseDouble(destino.getLongitude())
         );
         adicionaMarcadorDestino(localDestino,"Destino");
-
         centralizarMarcadores(localDestino);
 
         //Calcular distancia
@@ -262,9 +264,8 @@ public class ClienteActivity extends AppCompatActivity
     }
 
     private void requisicaoCancelada(){
-        linearLayoutDestino.setVisibility(View.GONE);
-        buttonChamarEntregador.setText("Chamar Entrega");
-        cancelarEntrega = false;
+        linearLayoutDestino.setVisibility(View.VISIBLE);
+        buttonChamarEntregador.setText("Chamar Entregador");
     }
 
     private void adicionaMarcadorCliente(LatLng localizacao, String titulo){
@@ -344,17 +345,36 @@ public class ClienteActivity extends AppCompatActivity
         recuperarLocalizaçaoUsuario();
 
     }
+
+    private void salvarRequisicao(Destino destino){
+        Requisicao requisicao = new Requisicao();
+        requisicao.setDestino(destino);
+
+        Usuario usuarioCliLogado = UsuarioFirebase.getDadosUsuarioLogado();
+        usuarioCliLogado.setLatitude(String.valueOf(localCliente.latitude));
+        usuarioCliLogado.setLongitude(String.valueOf(localCliente.longitude));
+
+        requisicao.setEntrega(usuarioCliLogado);
+
+        requisicao.setStatus(Requisicao.STATUS_AGUARDANDO);
+        requisicao.salvar();
+
+        linearLayoutDestino.setVisibility(View.GONE);
+        buttonChamarEntregador.setText("Cancelar Entrega");
+        cancelarEntrega = true;
+    }
+
     public void chamarEntregador(View view){
 
-        if ( cancelarEntrega ){
-            //Cancelar requisição
+        Log.d("p->", "Valor Cancelar entrega:" + cancelarEntrega);
 
+        if ( cancelarEntrega ){
             requisicao.setStatus(Requisicao.STATUS_CANCELADA);
             requisicao.atualizarStatus();
+            cancelarEntrega = false;
 
+            Log.d("p->", "Valor Cancelar entrega3:" + cancelarEntrega);
 
-
-            //Fim
         }else{
             String endereçoDestino = editDestino.getText().toString();
 
@@ -384,6 +404,7 @@ public class ClienteActivity extends AppCompatActivity
                                 @Override
                                 public void onClick(DialogInterface dialog, int which) {
                                     salvarRequisicao(destino);
+                                    Log.d("p->", "Valor Cancelar entrega2:" + cancelarEntrega);
                                 }
                             }).setNegativeButton("Cancelar", new DialogInterface.OnClickListener() {
                                 @Override
@@ -402,22 +423,6 @@ public class ClienteActivity extends AppCompatActivity
         }
     }
 
-    private void salvarRequisicao(Destino destino){
-        Requisicao requisicao = new Requisicao();
-        requisicao.setDestino(destino);
-
-        Usuario usuarioCliLogado = UsuarioFirebase.getDadosUsuarioLogado();
-        usuarioCliLogado.setLatitude(String.valueOf(localCliente.latitude));
-        usuarioCliLogado.setLongitude(String.valueOf(localCliente.longitude));
-
-        requisicao.setEntrega(usuarioCliLogado);
-
-        requisicao.setStatus(Requisicao.STATUS_AGUARDANDO);
-        requisicao.salvar();
-
-        linearLayoutDestino.setVisibility(View.GONE);
-        buttonChamarEntregador.setText("Cancelar Entrega");
-    }
 
     private Address recuperarEndereco(String endereco){
         Geocoder geocoder = new Geocoder(this, Locale.getDefault());
