@@ -97,7 +97,7 @@ public class ClienteActivity extends AppCompatActivity
 
         Usuario usuarioLogado = UsuarioFirebase.getDadosUsuarioLogado();
         DatabaseReference requisicoes = firebaseRef.child("requisicoes");
-        Query requisicaoPesquisa = requisicoes.orderByChild("passageiro/id")
+        Query requisicaoPesquisa = requisicoes.orderByChild("entrega/id")
                 .equalTo( usuarioLogado.getId() );
 
         requisicaoPesquisa.addValueEventListener(new ValueEventListener() {
